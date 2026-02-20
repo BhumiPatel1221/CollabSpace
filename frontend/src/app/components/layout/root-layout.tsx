@@ -13,6 +13,7 @@ export function RootLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = React.useState(false);
   const [isDarkMode, setIsDarkMode] = React.useState(false);
   const [showNotifications, setShowNotifications] = React.useState(false);
   const notifRef = React.useRef<HTMLDivElement>(null);
@@ -127,7 +128,7 @@ export function RootLayout() {
           <div className="flex items-center gap-3">
             {/* Sidebar toggle / menu */}
             <button
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
               className="p-2 hover:bg-[rgba(139,92,246,0.08)] rounded-[10px] transition-colors md:hidden"
             >
               <Menu className="w-5 h-5 text-[#6B7280]" />
@@ -172,7 +173,7 @@ export function RootLayout() {
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -10, scale: 0.95 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute right-0 top-full mt-2 w-96 max-h-[480px] glass-panel-strong rounded-[18px] overflow-hidden z-50"
+                    className="fixed right-3 left-3 top-[72px] md:absolute md:left-auto md:top-full md:right-0 md:mt-2 md:w-96 max-h-[480px] glass-panel-strong rounded-[18px] overflow-hidden z-50"
                   >
                     {/* Header */}
                     <div className="flex items-center justify-between px-5 py-4 border-b border-[rgba(139,92,246,0.1)]">
@@ -277,6 +278,85 @@ export function RootLayout() {
         </header>
       </div>
 
+      {/* ──── Mobile Sidebar Drawer (overlay) ──── */}
+      <AnimatePresence>
+        {isMobileSidebarOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/40 z-40 md:hidden"
+              onClick={() => setIsMobileSidebarOpen(false)}
+            />
+            {/* Drawer */}
+            <motion.aside
+              initial={{ x: -280 }}
+              animate={{ x: 0 }}
+              exit={{ x: -280 }}
+              transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+              className="fixed top-0 left-0 bottom-0 w-[260px] z-50 glass-panel-strong flex flex-col py-5 px-4 gap-1 md:hidden overflow-y-auto"
+            >
+              <div className="flex items-center justify-between mb-6 px-1">
+                <Logo height={28} linkTo="/dashboard" />
+                <button
+                  onClick={() => setIsMobileSidebarOpen(false)}
+                  className="p-2 hover:bg-[rgba(139,92,246,0.08)] rounded-[10px] transition-colors"
+                >
+                  <X className="w-5 h-5 text-[#6B7280]" />
+                </button>
+              </div>
+
+              <MobileSidebarLink
+                icon={LayoutDashboard}
+                label="Dashboard"
+                to="/dashboard"
+                active={isDashboard && !location.search.includes("settings") && !location.search.includes("shared-with-me")}
+                onClick={() => setIsMobileSidebarOpen(false)}
+              />
+              <MobileSidebarLink
+                icon={FileText}
+                label="My Documents"
+                to="/dashboard?tab=my-documents"
+                active={isDashboard && (location.search === "" || location.search.includes("my-documents"))}
+                onClick={() => setIsMobileSidebarOpen(false)}
+              />
+              <MobileSidebarLink
+                icon={Share2}
+                label="Shared with Me"
+                to="/dashboard?tab=shared-with-me"
+                active={location.search.includes("shared-with-me")}
+                onClick={() => setIsMobileSidebarOpen(false)}
+              />
+              <MobileSidebarLink
+                icon={Settings}
+                label="Settings"
+                to="/dashboard?tab=settings"
+                active={location.search.includes("settings")}
+                onClick={() => setIsMobileSidebarOpen(false)}
+              />
+
+              <div className="flex-1" />
+
+              {/* User info */}
+              <div className="flex items-center gap-3 px-2 pt-4 border-t border-[rgba(139,92,246,0.1)]">
+                <Avatar
+                  fallback={getInitials(displayName)}
+                  src={currentUser?.photoURL || undefined}
+                  size="sm"
+                  online
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-[#1E1B4B] dark:text-[#E8E6F0] truncate">{displayName}</p>
+                  <p className="text-[11px] text-[#6B7280] dark:text-[#9CA3AF] truncate">{currentUser?.email}</p>
+                </div>
+              </div>
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* ──── Floating sidebar (icons-only) + Main Content ──── */}
       <div className="flex-1 flex overflow-hidden px-4 pb-3 gap-3">
         {/* Left: Collapsible floating mini-panel (icons only on desktop) */}
@@ -309,9 +389,33 @@ export function RootLayout() {
         </AnimatePresence>
 
         {/* Main content area */}
-        <main className="flex-1 overflow-auto rounded-[18px] glass-panel">
+        <main className="flex-1 overflow-auto rounded-[18px] glass-panel pb-16 md:pb-0">
           <Outlet />
         </main>
+      </div>
+
+      {/* ──── Mobile Bottom Tab Bar ──── */}
+      <div className="flex-shrink-0 px-3 pb-2 md:hidden">
+        <div className="glass-panel-strong rounded-[16px] h-14 flex items-center justify-around px-2">
+          <MobileBottomTab
+            icon={FileText}
+            label="Docs"
+            to="/dashboard?tab=my-documents"
+            active={isDashboard && (location.search === "" || location.search.includes("my-documents")) && !location.search.includes("settings")}
+          />
+          <MobileBottomTab
+            icon={Share2}
+            label="Shared"
+            to="/dashboard?tab=shared-with-me"
+            active={location.search.includes("shared-with-me")}
+          />
+          <MobileBottomTab
+            icon={Settings}
+            label="Settings"
+            to="/dashboard?tab=settings"
+            active={location.search.includes("settings")}
+          />
+        </div>
       </div>
 
       {/* ──── Bottom Activity Bar ──── */}
@@ -372,6 +476,43 @@ function NavTab({ to, active, icon: Icon, label }: { to: string; active?: boolea
     >
       <Icon className="w-3.5 h-3.5" />
       <span className="hidden lg:inline">{label}</span>
+    </Link>
+  );
+}
+
+/* ─── Mobile sidebar link ─── */
+function MobileSidebarLink({ icon: Icon, label, to, active, onClick }: { icon: any; label: string; to: string; active?: boolean; onClick?: () => void }) {
+  return (
+    <Link
+      to={to}
+      onClick={onClick}
+      className={cn(
+        "flex items-center gap-3 px-3 py-2.5 rounded-[12px] text-sm font-medium transition-all duration-200",
+        active
+          ? "bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white shadow-lg shadow-[#6366F1]/20"
+          : "text-[#6B7280] dark:text-[#9CA3AF] hover:bg-[rgba(139,92,246,0.08)] hover:text-[#6366F1] dark:hover:text-[#C4B5FD]"
+      )}
+    >
+      <Icon className="w-5 h-5" />
+      {label}
+    </Link>
+  );
+}
+
+/* ─── Mobile bottom tab ─── */
+function MobileBottomTab({ icon: Icon, label, to, active }: { icon: any; label: string; to: string; active?: boolean }) {
+  return (
+    <Link
+      to={to}
+      className={cn(
+        "flex flex-col items-center justify-center gap-0.5 flex-1 py-1.5 rounded-[10px] transition-all duration-200",
+        active
+          ? "text-[#6366F1] dark:text-[#C4B5FD]"
+          : "text-[#6B7280] dark:text-[#9CA3AF]"
+      )}
+    >
+      <Icon className={cn("w-5 h-5", active && "drop-shadow-[0_0_6px_rgba(99,102,241,0.4)]")} />
+      <span className={cn("text-[10px] font-medium", active && "font-bold")}>{label}</span>
     </Link>
   );
 }

@@ -93,7 +93,7 @@ export function Navbar({ isDarkMode, onToggleDarkMode }: NavbarProps) {
                     {currentUser ? (
                         <>
                             <Link to="/dashboard">
-                                <Button size="sm" className="hidden md:flex text-sm">Dashboard</Button>
+                                <Button size="sm" className="text-sm">Dashboard</Button>
                             </Link>
                             <button
                                 onClick={handleLogout}
