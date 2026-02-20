@@ -1,0 +1,90 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ========================
+    // USER PROFILES
+    // ========================
+    match /users/{userId} {
+      // Any authenticated user can read user profiles (needed for email lookup during sharing)
+      allow read: if request.auth != null;
+
+      // Users can only create/update their own profile
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && request.auth.uid == userId;
+
+      // Users can only delete their own profile
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ========================
+    // DOCUMENTS
+    // ========================
+    match /documents/{docId} {
+
+      // Helper: Check if the user is the document owner
+      function isOwner() {
+        return request.auth != null && resource.data.ownerId == request.auth.uid;
+      }
+
+      // Helper: Check if the user is a collaborator with a specific role
+      function isCollaborator(role) {
+        return request.auth != null
+          && request.auth.uid in resource.data.collaborators
+          && resource.data.collaborators[request.auth.uid].role == role;
+      }
+
+      // Helper: Check if user has any access (owner, editor, or viewer)
+      function hasAccess() {
+        return isOwner() || request.auth.uid in resource.data.collaborators;
+      }
+
+      // Read: Owner or any collaborator (editor/viewer) can read
+      allow read: if request.auth != null && hasAccess();
+
+      // Create: Any authenticated user can create a new document
+      // Validate that they set themselves as the owner
+      allow create: if request.auth != null
+        && request.resource.data.ownerId == request.auth.uid;
+
+      // Update: Only owner or editor collaborators can write
+      allow update: if request.auth != null
+        && (isOwner() || isCollaborator('editor'));
+
+      // Delete: Only the owner can delete a document
+      allow delete: if request.auth != null && isOwner();
+
+      // ========================
+      // VERSION HISTORY (subcollection)
+      // ========================
+      match /versions/{versionId} {
+        // Read: Anyone with access to the parent document can read versions
+        allow read: if request.auth != null
+          && (get(/databases/$(database)/documents/documents/$(docId)).data.ownerId == request.auth.uid
+              || request.auth.uid in get(/databases/$(database)/documents/documents/$(docId)).data.collaborators);
+
+        // Create: Only owner or editor can create versions
+        allow create: if request.auth != null
+          && (get(/databases/$(database)/documents/documents/$(docId)).data.ownerId == request.auth.uid
+              || (request.auth.uid in get(/databases/$(database)/documents/documents/$(docId)).data.collaborators
+                  && get(/databases/$(database)/documents/documents/$(docId)).data.collaborators[request.auth.uid].role == 'editor'));
+
+        // No update or delete of versions (immutable history)
+        allow update, delete: if false;
+      }
+    }
+
+    // ========================
+    // PRESENCE
+    // ========================
+    match /presence/{docId}/users/{userId} {
+      // Anyone authenticated can read presence
+      allow read: if request.auth != null;
+
+      // Users can only write/delete their own presence
+      allow write: if request.auth != null && request.auth.uid == userId;
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
